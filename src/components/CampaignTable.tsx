@@ -1,28 +1,37 @@
 // src/components/CampaignTable.tsx
-import React, { useMemo } from 'react';
-import { CampaignData, Country, CampaignType } from '../types/campaign';
-import { Timestamp } from 'firebase/firestore';
 import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  ColumnDef, // Type for column definitions
-  Row, // Type for row object
+    ColumnDef,
+    flexRender,
+    getCoreRowModel, // Type for column definitions
+    Row,
+    useReactTable,
 } from '@tanstack/react-table';
+import { Timestamp } from 'firebase/firestore';
+import React, { useMemo } from 'react';
+import { CampaignData, CampaignType, Country } from '../types/campaign';
 import EditableCell from './EditableCell'; // Import the editable cell
+// ... other imports ...
+import {
+    calculateCost,
+    calculateEffectiveness,
+    calculateEndDate,
+    calculateRankBoost,
+    calculateTotalInstalls,
+    countActiveDays
+} from '../utils/campaignCalculations';
 
 interface CampaignTableProps {
-  campaigns: CampaignData[];
-  isLoading: boolean;
-  // Function to update a specific cell in a campaign
-  updateCampaignField: (campaignId: string, columnId: string, value: any) => void;
-  // Later: add functions for delete, etc.
-}
+    campaigns: CampaignData[];
+    isLoading: boolean;
+    updateCampaignField: (campaignId: string, columnId: string, value: any) => void;
+    costPerInstall: number | null; // Receive costPerInstall config
+  }
 
 const CampaignTable: React.FC<CampaignTableProps> = ({
     campaigns,
     isLoading,
-    updateCampaignField
+    updateCampaignField,
+    costPerInstall
 }) => {
 
   // Define columns using React Table's ColumnDef type
@@ -155,10 +164,62 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
           />
         ),
     },
-    // TODO: Add columns for calculated fields later (endDate, rankBoost, totalInstalls, cost, effectiveness)
-    // These won't use EditableCell initially, just display calculated values.
-
-  ], [updateCampaignField]); // Dependency array for useMemo
+    // --- Calculated Columns ---
+    {
+        id: 'endDate', // Use id for calculated columns without direct accessorKey
+        header: 'Enddatum',
+        // size: 120,
+        cell: ({ row }) => { // Access the full row data
+          const campaign = row.original;
+          const activeDays = countActiveDays(campaign);
+          const endDate = calculateEndDate(campaign.startDate, activeDays);
+          return endDate ? endDate.toDate().toLocaleDateString() : '-';
+        }
+      },
+      {
+        id: 'rankBoost',
+        header: 'Rank Boost',
+        // size: 100,
+        cell: ({ row }) => {
+          const boost = calculateRankBoost(row.original.currentRank, row.original.endRank);
+          // Optional: Add styling based on value (positive/negative)
+          const style: React.CSSProperties = {};
+          if (boost !== null) {
+              style.color = boost > 0 ? 'green' : boost < 0 ? 'red' : 'inherit';
+          }
+          return <span style={style}>{boost !== null ? boost : '-'}</span>;
+        }
+      },
+      {
+        id: 'totalInstalls',
+        header: 'Total Installs',
+        // size: 100,
+        cell: ({ row }) => {
+          const total = calculateTotalInstalls(row.original);
+          return total !== null ? total : '-';
+        }
+      },
+      {
+        id: 'cost',
+        header: 'Cost',
+        // size: 100,
+        cell: ({ row }) => {
+          const totalInstalls = calculateTotalInstalls(row.original);
+          const cost = calculateCost(totalInstalls, costPerInstall); // Use config value
+          // Optional: Format as currency
+          return cost !== null ? `€${cost.toFixed(2)}` : '-'; // Example currency format
+        }
+      },
+      {
+        id: 'effectiveness',
+        header: 'Effectiveness',
+        // size: 100,
+         cell: ({ row }) => {
+          const effectiveness = calculateEffectiveness(/* row.original */); // Pass data if needed by formula
+          return effectiveness !== null ? effectiveness : '-'; // Placeholder
+        }
+      },
+  ], [updateCampaignField, costPerInstall]); // Dependency array for useMemo
 
   // Setup React Table instance
   const table = useReactTable({

@@ -8,10 +8,14 @@ import { useNavigate } from 'react-router-dom';
 import CampaignTable from '../components/CampaignTable';
 import AddCampaignModal from '../components/AddCampaignModal';
 import { CampaignData, NewCampaignInput } from '../types/campaign';
+import { useLocalStorage } from '../hooks/useLocalStorage';
+import { calculateTotalInstalls, calculateCost } from '../utils/campaignCalculations'; // Import calculation
+
 
 function CampaignTablePage() {
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
+  const [costPerInstall] = useLocalStorage<number | null>('config_costPerInstall', null); // Default to null
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -126,6 +130,7 @@ function CampaignTablePage() {
           campaigns={campaigns}
           isLoading={isLoading}
           updateCampaignField={handleUpdateCampaignField} // Pass the update function
+          costPerInstall={costPerInstall} // Pass config value down
       />
 
       <AddCampaignModal
