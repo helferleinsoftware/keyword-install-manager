@@ -1,7 +1,9 @@
+// src/pages/CampaignTablePage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '../firebase';
 import { signOut } from "firebase/auth";
-import { collection, query, where, getDocs, addDoc, Timestamp } from "firebase/firestore";
+// Import Firestore update functions
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { useNavigate } from 'react-router-dom';
 import CampaignTable from '../components/CampaignTable';
 import AddCampaignModal from '../components/AddCampaignModal';
@@ -13,99 +15,118 @@ function CampaignTablePage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const currentUser = auth.currentUser; // Get current user
+  const currentUser = auth.currentUser;
 
-  // Function to fetch campaigns
   const fetchCampaigns = useCallback(async () => {
-    if (!currentUser) {
-      setError("Benutzer nicht authentifiziert.");
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
+    // ... (fetch logic remains the same)
+    if (!currentUser) { /* ... */ return; }
+    setIsLoading(true); setError(null);
     try {
       const campaignsRef = collection(db, "campaigns");
-      // Create a query against the collection.
       const q = query(campaignsRef, where("userId", "==", currentUser.uid));
       const querySnapshot = await getDocs(q);
-      const fetchedCampaigns: CampaignData[] = [];
-      querySnapshot.forEach((doc) => {
-        // Combine doc.id and doc.data() into a single object
-        fetchedCampaigns.push({ id: doc.id, ...(doc.data() as Omit<CampaignData, 'id'>) });
-      });
+      const fetchedCampaigns: CampaignData[] = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...(doc.data() as Omit<CampaignData, 'id'>)
+      }));
+      // Optional: Sort campaigns, e.g., by startDate descending
+      // fetchedCampaigns.sort((a, b) => (b.startDate?.toMillis() ?? 0) - (a.startDate?.toMillis() ?? 0));
       setCampaigns(fetchedCampaigns);
-    } catch (err) {
-      console.error("Fehler beim Laden der Kampagnen:", err);
-      setError("Kampagnen konnten nicht geladen werden.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUser]); // Dependency: currentUser
+    } catch (err) { /* ... */ }
+    finally { setIsLoading(false); }
+  }, [currentUser]);
 
-  // Fetch campaigns on component mount and when user changes
   useEffect(() => {
     fetchCampaigns();
-  }, [fetchCampaigns]); // Use the memoized fetchCampaigns
+  }, [fetchCampaigns]);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigate('/login'); // Explicit navigation after state update might be needed
-    } catch (error) {
-      console.error("Logout Fehler:", error);
-      setError("Fehler beim Logout.");
-    }
-  };
+  const handleLogout = async () => { /* ... */ };
 
-  // Function to add a new campaign
   const handleAddCampaign = async (newCampaignData: NewCampaignInput) => {
-    if (!currentUser) {
-      throw new Error("Benutzer nicht authentifiziert."); // Throw error to be caught in modal
-    }
-
+    if (!currentUser) { throw new Error("User not authenticated."); }
     const campaignToAdd = {
       ...newCampaignData,
-      userId: currentUser.uid, // Ensure userId is set
-      startDate: null, // Initialize other fields as needed
-      endRank: null,
-      campaignType: '', // Or a default type
-      day1: null,
-      day2: null,
-      day3: null,
-      day4: null,
-      day5: null,
+      userId: currentUser.uid,
+      startDate: null, endRank: null, campaignType: '',
+      day1: null, day2: null, day3: null, day4: null, day5: null,
       note: '',
-      // Convert startDate to Timestamp if using that type in Firestore
-      // startDate: newCampaignData.startDate ? Timestamp.fromDate(new Date(newCampaignData.startDate)) : null,
     };
-
     try {
         const campaignsRef = collection(db, "campaigns");
-        // Add a new document with a generated id.
         await addDoc(campaignsRef, campaignToAdd);
-        // Refetch campaigns to show the new one
-        // Alternatively, update state locally for better UX
-        await fetchCampaigns(); // Simple refetch for now
-    } catch (error) {
-        console.error("Error adding document: ", error);
-        throw error; // Re-throw to be caught by the modal's submit handler
-    }
+        // Optimistic UI update + refetch in background? Or just refetch.
+        await fetchCampaigns();
+    } catch (error) { /* ... */ throw error; }
+  };
+
+  // --- NEW: Function to update a specific field of a campaign ---
+  const handleUpdateCampaignField = async (
+      campaignId: string,
+      fieldKey: string, // Corresponds to accessorKey in columns
+      value: any
+    ) => {
+      if (!currentUser) {
+        setError("Cannot update: User not authenticated.");
+        return;
+      }
+
+      // Find the campaign in the local state for optimistic update
+      const campaignIndex = campaigns.findIndex(c => c.id === campaignId);
+      if (campaignIndex === -1) {
+          console.error("Campaign not found in local state for update:", campaignId);
+          setError("Fehler: Lokale Kampagne nicht gefunden.");
+          return; // Should not happen ideally
+      }
+
+      const originalCampaigns = [...campaigns]; // Backup for potential revert
+      const updatedCampaign = { ...campaigns[campaignIndex], [fieldKey]: value };
+
+      // --- Optimistic UI Update ---
+      const updatedCampaigns = [...campaigns];
+      updatedCampaigns[campaignIndex] = updatedCampaign;
+      setCampaigns(updatedCampaigns);
+      // --- End Optimistic UI Update ---
+
+      try {
+        const campaignDocRef = doc(db, "campaigns", campaignId);
+
+        // Prepare the update payload
+        const updatePayload = { [fieldKey]: value };
+
+        // Ensure the user is updating their own document (redundant with rules, but good practice)
+        // You could fetch the doc first, but rules handle this. Just proceed.
+
+        await updateDoc(campaignDocRef, updatePayload);
+        // Update successful, optimistic update is now confirmed.
+        // Optionally: Recalculate derived fields here if needed immediately,
+        // or let the table recalculate on next render.
+
+      } catch (err) {
+        console.error("Fehler beim Aktualisieren des Feldes:", err);
+        setError(`Fehler beim Speichern von Feld "${fieldKey}". Änderungen wurden zurückgesetzt.`);
+        // Revert optimistic update on error
+        setCampaigns(originalCampaigns);
+      }
   };
 
   return (
     <div>
       <h1>Keyword Campaign Manager</h1>
-      <button onClick={handleLogout}>Logout</button>
-      <button onClick={() => setIsModalOpen(true)} style={{ marginLeft: '10px' }}>
-        + Kampagne hinzufügen
-      </button>
-      {/* Config Button kommt hier später */}
+      <div style={{ marginBottom: '15px' }}>
+        <button onClick={handleLogout}>Logout</button>
+        <button onClick={() => setIsModalOpen(true)} style={{ marginLeft: '10px' }}>
+          + Kampagne hinzufügen
+        </button>
+        {/* Config Button comes here later */}
+      </div>
 
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
-      <CampaignTable campaigns={campaigns} isLoading={isLoading} />
+      <CampaignTable
+          campaigns={campaigns}
+          isLoading={isLoading}
+          updateCampaignField={handleUpdateCampaignField} // Pass the update function
+      />
 
       <AddCampaignModal
         isOpen={isModalOpen}

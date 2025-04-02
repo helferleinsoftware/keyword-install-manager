@@ -11,17 +11,19 @@ function App() {
   // State, um anzuzeigen, ob der Auth-Status noch geprüft wird
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Effekt, der auf Änderungen des Auth-Status hört
   useEffect(() => {
-    // onAuthStateChanged gibt eine unsubscribe Funktion zurück
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser); // Setze den User-State (kann null sein)
-      setLoading(false); // Ladezustand beenden, wenn Status bekannt ist
+      console.log("Auth State Changed:", currentUser ? currentUser.uid : 'No user'); // Log Erfolg
+      setUser(currentUser);
+      setLoading(false);
+    }, (error) => { // Add error callback
+        console.error("Error in onAuthStateChanged:", error); // Log Fehler
+        console.log("Error in onAuthStateChanged:", error);
+        setLoading(false); // Beende Ladezustand auch bei Fehler
     });
-
-    // Cleanup-Funktion: Beim Unmounten der Komponente wird der Listener entfernt
+  
     return () => unsubscribe();
-  }, []); // Leeres Abhängigkeitsarray: Effekt läuft nur einmal beim Mounten
+  }, []);
 
   // Zeige Ladeindikator, während der Auth-Status geprüft wird
   if (loading) {

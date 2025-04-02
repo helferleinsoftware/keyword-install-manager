@@ -1,3 +1,6 @@
+import { Timestamp } from 'firebase/firestore'; // Import Timestamp type
+
+
 export enum Country {
     DE = "Germany",
     US = "USA",
@@ -13,12 +16,12 @@ export enum Country {
   }
   
   export interface CampaignData {
-    id: string; // Firestore document ID
-    userId: string; // Firebase Auth User ID of the owner
+    id: string;
+    userId: string;
   
-    country: Country | string; // Allow string for flexibility or define all in Enum
+    country: Country | string;
     keyword: string;
-    startDate: string | null; // Store as ISO string or Firestore Timestamp, handle conversion
+    startDate: Timestamp | null;
     difficulty: number | null;
     currentRank: number | null;
     endRank: number | null;
@@ -30,12 +33,12 @@ export enum Country {
     day5?: number | null;
     note?: string;
   
-    // Fields calculated primarily on the frontend, might not be stored
-    // endDate?: string;
+    // Calculated fields (derived in frontend for now)
+    // endDate?: Timestamp | null; // Would also be a Timestamp if calculated from startDate
     // rankBoost?: number;
     // totalInstalls?: number;
     // cost?: number;
-    // effectiveness?: string; // Formula TBD
+    // effectiveness?: string;
   }
   
   // Type for the data needed when creating a new campaign initially
