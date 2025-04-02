@@ -1,36 +1,39 @@
+import { onAuthStateChanged, User } from "firebase/auth"; // Importiere nötige Auth-Funktionen und Typen
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { auth } from './firebase'; // Importiere die Auth-Instanz
 import CampaignTablePage from './pages/CampaignTablePage';
 import LoginPage from './pages/LoginPage';
-// import { auth } from './firebase'; // Wird später für Auth-Status benötigt
-// import { onAuthStateChanged } from "firebase/auth"; // Wird später benötigt
 
 function App() {
-  // const [user, setUser] = useState(null); // Zustand für eingeloggten User kommt später
-  // const [loading, setLoading] = useState(true); // Ladezustand kommt später
+  // State für den eingeloggten User (Firebase User Objekt oder null)
+  const [user, setUser] = useState<User | null>(null);
+  // State, um anzuzeigen, ob der Auth-Status noch geprüft wird
+  const [loading, setLoading] = useState<boolean>(true);
 
-  // Effekt zum Prüfen des Auth-Status kommt später
-  // useEffect(() => {
-  //   const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-  //     setUser(currentUser);
-  //     setLoading(false);
-  //   });
-  //   return () => unsubscribe(); // Cleanup on unmount
-  // }, []);
+  // Effekt, der auf Änderungen des Auth-Status hört
+  useEffect(() => {
+    // onAuthStateChanged gibt eine unsubscribe Funktion zurück
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser); // Setze den User-State (kann null sein)
+      setLoading(false); // Ladezustand beenden, wenn Status bekannt ist
+    });
 
-  // if (loading) {
-  //   return <div>Laden...</div>; // Ladeanzeige kommt später
-  // }
+    // Cleanup-Funktion: Beim Unmounten der Komponente wird der Listener entfernt
+    return () => unsubscribe();
+  }, []); // Leeres Abhängigkeitsarray: Effekt läuft nur einmal beim Mounten
 
-  // Platzhalter-Logik: Wir gehen erstmal davon aus, dass man eingeloggt ist
-  // Später wird dies durch die user-Variable gesteuert
-  const isLoggedIn = true; // TODO: Später durch echten Auth-Status ersetzen
+  // Zeige Ladeindikator, während der Auth-Status geprüft wird
+  if (loading) {
+    return <div>Authentifizierung wird geprüft...</div>;
+  }
 
+  // Routing-Logik basierend auf dem User-State
   return (
     <Routes>
-      <Route path="/login" element={!isLoggedIn ? <LoginPage /> : <Navigate to="/" />} />
-      <Route path="/" element={isLoggedIn ? <CampaignTablePage /> : <Navigate to="/login" />} />
-      {/* Catch-all oder 404-Seite könnte hier hinzugefügt werden */}
-      <Route path="*" element={<Navigate to={isLoggedIn ? "/" : "/login"} />} />
+      <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/" />} />
+      <Route path="/" element={user ? <CampaignTablePage /> : <Navigate to="/login" />} />
+      <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
     </Routes>
   );
 }
