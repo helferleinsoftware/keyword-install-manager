@@ -30,12 +30,12 @@ interface CampaignTableProps {
     isLoading: boolean;
     updateCampaignField: (campaignId: string, columnId: string, value: any) => void;
     costPerInstall: number | null;
-    // Filter and Sorting Props
     columnFilters: ColumnFiltersState;
     setColumnFilters: React.Dispatch<React.SetStateAction<ColumnFiltersState>>;
     handleCellClickForFilter: (columnId: string, value: any) => void;
     sorting: SortingState;
     setSorting: React.Dispatch<React.SetStateAction<SortingState>>;
+    deleteCampaign: (campaignId: string) => void; 
 }
 
 const CampaignTable: React.FC<CampaignTableProps> = ({
@@ -44,13 +44,13 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
     updateCampaignField,
     costPerInstall,
     columnFilters,
-    setColumnFilters, // Not needed if fully managed by parent
+    setColumnFilters,
     handleCellClickForFilter,
     sorting,
-    setSorting
+    setSorting,
+    deleteCampaign
 }) => {
 
-    // Define columns using React Table's ColumnDef type
     const columns = useMemo<ColumnDef<CampaignData>[]>(() => [
         {
             accessorKey: 'country',
@@ -239,10 +239,29 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
                 return effectiveness !== null ? effectiveness : '-'; // Placeholder
             }
         },
-    ], [updateCampaignField, costPerInstall]); // Dependency array for useMemo
+        {
+            id: 'actions',
+            header: 'Aktionen',
+            enableColumnFilter: false,
+            cell: ({ row }) => (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent row click/filter if button is clicked
+                        if (window.confirm(`Kampagne "${row.original.keyword}" wirklich löschen?`)) {
+                            deleteCampaign(row.original.id);
+                        }
+                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'red', padding: '0 5px' }}
+                    title="Kampagne löschen"
+                >
+                    X
+                </button>
+            ),
+        },
+    ], [updateCampaignField, costPerInstall, deleteCampaign]);
 
     const activeFilterIds = useMemo(() => new Set(columnFilters.map(f => f.id)), [columnFilters]);
-    const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref to hold the timeout ID
+    const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     
     // Setup React Table instance

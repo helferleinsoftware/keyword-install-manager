@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
 // Import Firestore update functions
 import { ColumnFiltersState, SortingState } from '@tanstack/react-table';
-import { addDoc, collection, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { useNavigate } from 'react-router-dom';
 import AddCampaignModal from '../components/AddCampaignModal';
 import CampaignTable from '../components/CampaignTable';
@@ -121,6 +121,30 @@ function CampaignTablePage() {
     }
   };
 
+  const handleDeleteCampaign = async (campaignId: string) => {
+    if (!currentUser) {
+       setError("Cannot delete: User not authenticated.");
+       return;
+    }
+    console.log("Attempting delete:", campaignId);
+
+    // Optimistic UI Update (optional but recommended for delete)
+    const originalCampaigns = [...campaigns];
+    setCampaigns(prevCampaigns => prevCampaigns.filter(c => c.id !== campaignId));
+
+    try {
+        const campaignDocRef = doc(db, "campaigns", campaignId);
+        await deleteDoc(campaignDocRef);
+        console.log("Delete successful");
+        // No refetch needed if optimistic update works
+    } catch (error) {
+        console.error("Error deleting document: ", error);
+        setError("Fehler beim Löschen der Kampagne.");
+        // Revert optimistic update on error
+        setCampaigns(originalCampaigns);
+    }
+};
+
   const handleCellClickForFilter = (columnId: string, value: any) => {
     console.log(`Filter click: Col=${columnId}, Val=`, value);
 
@@ -202,6 +226,7 @@ function CampaignTablePage() {
         handleCellClickForFilter={handleCellClickForFilter} // Pass click handler
         sorting={sorting} // Pass sorting state
         setSorting={setSorting} // Pass sorting setter 
+        deleteCampaign={handleDeleteCampaign}
       />
 
       <AddCampaignModal
