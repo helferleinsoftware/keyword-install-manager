@@ -10,7 +10,7 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import { Timestamp } from 'firebase/firestore';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { CampaignData, CampaignType, Country } from '../types/campaign';
 import EditableCell from './EditableCell';
 import {
@@ -22,6 +22,8 @@ import {
     countActiveDays
 } from '../utils/campaignCalculations';
 import { filterRange } from '../utils/filter';
+
+const SINGLE_CLICK_DELAY_MS = 200;
 
 interface CampaignTableProps {
     campaigns: CampaignData[];
@@ -240,7 +242,9 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
     ], [updateCampaignField, costPerInstall]); // Dependency array for useMemo
 
     const activeFilterIds = useMemo(() => new Set(columnFilters.map(f => f.id)), [columnFilters]);
+    const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref to hold the timeout ID
 
+    
     // Setup React Table instance
     const table = useReactTable({
         data: campaigns,
@@ -275,6 +279,15 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
         }
     });
 
+    useEffect(() => {
+        // Clear any running timeout when the component unmounts
+        return () => {
+          if (clickTimeoutRef.current) {
+            clearTimeout(clickTimeoutRef.current);
+          }
+        };
+      }, []);
+      
     if (isLoading) {
         return <div>Lade Kampagnen...</div>;
     }
@@ -318,15 +331,31 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
                             // Apply bold style to whole column if filter active (alternative to header bold)
                             // fontWeight: activeFilterIds.has(cell.column.id) ? 'bold' : 'normal',
                         }}
-                        // Attach the click handler for filtering
                         onClick={() => {
-                            // Only trigger filter on filterable columns AND non-editing cells
-                            if (cell.column.getCanFilter()) {
-                                handleCellClickForFilter(cell.column.id, cell.getContext().getValue());
+                            // Clear any previous pending click timeout
+                            if (clickTimeoutRef.current) {
+                                clearTimeout(clickTimeoutRef.current);
+                                clickTimeoutRef.current = null;
                             }
-                        }}
-                        // Prevent click handler while editing (double-click handled by EditableCell)
-                        onDoubleClick={(e) => e.stopPropagation()}
+      
+                            // Start a new timeout for the single click action (filtering)
+                            clickTimeoutRef.current = setTimeout(() => {
+                                // Execute filter action only if the timeout completes
+                                if (cell.column.getCanFilter()) {
+                                    handleCellClickForFilter(cell.column.id, cell.getContext().getValue());
+                                }
+                                clickTimeoutRef.current = null; // Clear ref after execution
+                            }, SINGLE_CLICK_DELAY_MS);
+                          }}
+                          onDoubleClick={() => {
+                              // If double click happens, clear the pending single click timeout
+                              if (clickTimeoutRef.current) {
+                                  clearTimeout(clickTimeoutRef.current);
+                                  clickTimeoutRef.current = null;
+                              }
+                              // The EditableCell's onDoubleClick will handle the editing start
+                              // We don't need to do anything else here for the double click itself
+                          }}
                       >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
