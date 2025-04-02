@@ -117,7 +117,7 @@ const ConfigModal: React.FC<ConfigModalProps> = ({ isOpen, onClose }) => {
           </div>
         </form>
          {/* Re-use modal styles from AddCampaignModal */}
-         <style jsx global>{`
+         <style>{`
         .modal-backdrop {
           position: fixed; top: 0; left: 0; width: 100%; height: 100%;
           background-color: rgba(0,0,0,0.5); display: flex;

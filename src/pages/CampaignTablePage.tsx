@@ -1,16 +1,15 @@
-// src/pages/CampaignTablePage.tsx
 import { useCallback, useEffect, useState } from 'react';
 import { auth, db } from '../firebase';
-// Import Firestore update functions
 import { ColumnFiltersState, SortingState } from '@tanstack/react-table';
 import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
-import { useNavigate } from 'react-router-dom';
 import AddCampaignModal from '../components/AddCampaignModal';
 import CampaignTable from '../components/CampaignTable';
 import ConfigModal from '../components/ConfigModal';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { CampaignData, NewCampaignInput } from '../types/campaign';
 import { COST_PER_INSTALL_KEY, DEFAULT_FILTER_RANGE_DIFFICULTY, DEFAULT_FILTER_RANGE_RANK, FILTER_RANGE_DIFFICULTY_KEY, FILTER_RANGE_RANK_KEY } from '../types/config';
+import { signOut } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 
 
 
@@ -44,15 +43,29 @@ function CampaignTablePage() {
       // Optional: Sort campaigns, e.g., by startDate descending
       // fetchedCampaigns.sort((a, b) => (b.startDate?.toMillis() ?? 0) - (a.startDate?.toMillis() ?? 0));
       setCampaigns(fetchedCampaigns);
-    } catch (err) { /* ... */ }
-    finally { setIsLoading(false); }
-  }, [currentUser]);
+    } catch (err) {
+      console.error("Fehler beim Laden der Kampagnen:", err);
+      setError("Kampagnen konnten nicht geladen werden.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser]); // Dependency: currentUser
+
 
   useEffect(() => {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
-  const handleLogout = async () => { /* ... */ };
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate('/login');
+    } catch (error) {
+      console.error("Logout Fehler:", error);
+      setError("Fehler beim Logout.");
+    }
+  };
+
 
   const handleAddCampaign = async (newCampaignData: NewCampaignInput) => {
     if (!currentUser) { throw new Error("User not authenticated."); }
@@ -68,14 +81,17 @@ function CampaignTablePage() {
       await addDoc(campaignsRef, campaignToAdd);
       // Optimistic UI update + refetch in background? Or just refetch.
       await fetchCampaigns();
-    } catch (error) { /* ... */ throw error; }
+    } catch (error) { 
+      console.error("Fehler beim Hinzufügen der Kampagne:", error);
+      setError("Fehler beim Hinzufügen der Kampagne.");
+    }
   };
 
   // --- NEW: Function to update a specific field of a campaign ---
   const handleUpdateCampaignField = async (
     campaignId: string,
     fieldKey: string, // Corresponds to accessorKey in columns
-    value: any
+    value: string | number | null | undefined
   ) => {
     if (!currentUser) {
       setError("Cannot update: User not authenticated.");
@@ -123,8 +139,8 @@ function CampaignTablePage() {
 
   const handleDeleteCampaign = async (campaignId: string) => {
     if (!currentUser) {
-       setError("Cannot delete: User not authenticated.");
-       return;
+      setError("Cannot delete: User not authenticated.");
+      return;
     }
     console.log("Attempting delete:", campaignId);
 
@@ -133,19 +149,19 @@ function CampaignTablePage() {
     setCampaigns(prevCampaigns => prevCampaigns.filter(c => c.id !== campaignId));
 
     try {
-        const campaignDocRef = doc(db, "campaigns", campaignId);
-        await deleteDoc(campaignDocRef);
-        console.log("Delete successful");
-        // No refetch needed if optimistic update works
+      const campaignDocRef = doc(db, "campaigns", campaignId);
+      await deleteDoc(campaignDocRef);
+      console.log("Delete successful");
+      // No refetch needed if optimistic update works
     } catch (error) {
-        console.error("Error deleting document: ", error);
-        setError("Fehler beim Löschen der Kampagne.");
-        // Revert optimistic update on error
-        setCampaigns(originalCampaigns);
+      console.error("Error deleting document: ", error);
+      setError("Fehler beim Löschen der Kampagne.");
+      // Revert optimistic update on error
+      setCampaigns(originalCampaigns);
     }
-};
+  };
 
-  const handleCellClickForFilter = (columnId: string, value: any) => {
+  const handleCellClickForFilter = (columnId: string, value: string | number | null | undefined) => {
     console.log(`Filter click: Col=${columnId}, Val=`, value);
 
     // Define which columns are filterable by click
@@ -173,7 +189,7 @@ function CampaignTablePage() {
       newFilters = columnFilters.filter(f => f.id !== columnId);
     } else {
       // Filter does not exist, add it (toggle on)
-      let filterValue: any;
+      let filterValue: string | number[] | number | null | undefined;
       if (rangeFilterColumns.includes(columnId)) {
         if (typeof value !== 'number' || range === null) {
           console.log("Cannot apply range filter: Invalid value or range not set.");

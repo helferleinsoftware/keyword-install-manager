@@ -22,7 +22,7 @@ export function calculateRankBoost(currentRank: number | null, endRank: number |
 
 export function calculateTotalInstalls(campaign: CampaignData): number | null {
     const installs = [campaign.day1, campaign.day2, campaign.day3, campaign.day4, campaign.day5]
-        .reduce((sum, installs) => sum + (typeof installs === 'number' ? installs : 0), 0);
+        .reduce((sum: number, installs) => sum + (typeof installs === 'number' ? installs : 0), 0);
     // Return null if no installs recorded, or 0 if explicitly 0 installs
     return installs > 0 || campaign.day1 !== null || campaign.day2 !== null || campaign.day3 !== null || campaign.day4 !== null || campaign.day5 !== null
            ? installs

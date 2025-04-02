@@ -5,6 +5,7 @@ import {
     getCoreRowModel,
     getFilteredRowModel,
     getSortedRowModel,
+    Getter,
     Row,
     SortingState,
     useReactTable,
@@ -35,7 +36,7 @@ interface CampaignTableProps {
     handleCellClickForFilter: (columnId: string, value: any) => void;
     sorting: SortingState;
     setSorting: React.Dispatch<React.SetStateAction<SortingState>>;
-    deleteCampaign: (campaignId: string) => void; 
+    deleteCampaign: (campaignId: string) => void;
 }
 
 const CampaignTable: React.FC<CampaignTableProps> = ({
@@ -161,9 +162,9 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
             accessorKey: `day${day}`,
             header: `Day ${day}`,
             enableColumnFilter: false,
-            cell: ({ getValue, row, column }: { getValue: any, row: Row<CampaignData>, column: any }) => (
+            cell: ({ getValue, row, column }: { getValue: Getter<number | null>, row: Row<CampaignData>, column: any }) => (
                 <EditableCell
-                    initialValue={getValue<number | null>()}
+                    initialValue={getValue()}
                     columnId={column.id}
                     updateData={(colId, value) => updateCampaignField(row.original.id, colId, value)}
                     cellConfig={{ type: 'number', min: 0 }}
@@ -234,7 +235,7 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
             id: 'effectiveness',
             header: 'Effectiveness',
             enableColumnFilter: false,
-            cell: ({ row }) => {
+            cell: () => {
                 const effectiveness = calculateEffectiveness(/* row.original */); // Pass data if needed by formula
                 return effectiveness !== null ? effectiveness : '-'; // Placeholder
             }
@@ -263,7 +264,7 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
     const activeFilterIds = useMemo(() => new Set(columnFilters.map(f => f.id)), [columnFilters]);
     const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    
+
     // Setup React Table instance
     const table = useReactTable({
         data: campaigns,
@@ -287,7 +288,7 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
         // We need to pass our update function down to the cells
         // This can be done via meta property
         meta: {
-            updateData: (rowIndex: number, columnId: string, value: any) => {
+            updateData: () => {
                 // This approach requires finding the campaignId using rowIndex, less direct
                 // Prefer passing updateCampaignField directly into cell render prop as done above
                 // const campaignId = campaigns[rowIndex]?.id;
@@ -301,90 +302,90 @@ const CampaignTable: React.FC<CampaignTableProps> = ({
     useEffect(() => {
         // Clear any running timeout when the component unmounts
         return () => {
-          if (clickTimeoutRef.current) {
-            clearTimeout(clickTimeoutRef.current);
-          }
+            if (clickTimeoutRef.current) {
+                clearTimeout(clickTimeoutRef.current);
+            }
         };
-      }, []);
-      
+    }, []);
+
     if (isLoading) {
         return <div>Lade Kampagnen...</div>;
     }
 
     return (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map(header => (
-                    <th key={header.id}
-                        style={{
-                            border: '1px solid black', padding: '4px', textAlign: 'left',
-                            // Indicate sortable columns
-                            cursor: header.column.getCanSort() ? 'pointer' : 'default',
-                            // Indicate filtered columns (bold column header)
-                            fontWeight: activeFilterIds.has(header.column.id) ? 'bold' : 'normal',
-                        }}
-                        onClick={header.column.getToggleSortingHandler()} // Enable sorting on header click
-                    >
-                      {flexRender( header.column.columnDef.header, header.getContext())}
-                      {/* Add Sort Icons */}
-                      {{
-                          asc: ' 🔼',
-                          desc: ' 🔽',
-                      }[header.column.getIsSorted() as string] ?? null}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => (
-                <tr key={row.id}>
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id}
-                        style={{
-                            border: '1px solid black', padding: '0',
-                            cursor: cell.column.getCanFilter() ? 'pointer' : 'default', // Indicate clickable filter cells
-                            // Apply bold style to whole column if filter active (alternative to header bold)
-                            // fontWeight: activeFilterIds.has(cell.column.id) ? 'bold' : 'normal',
-                        }}
-                        onClick={() => {
-                            // Clear any previous pending click timeout
-                            if (clickTimeoutRef.current) {
-                                clearTimeout(clickTimeoutRef.current);
-                                clickTimeoutRef.current = null;
-                            }
-      
-                            // Start a new timeout for the single click action (filtering)
-                            clickTimeoutRef.current = setTimeout(() => {
-                                // Execute filter action only if the timeout completes
-                                if (cell.column.getCanFilter()) {
-                                    handleCellClickForFilter(cell.column.id, cell.getContext().getValue());
-                                }
-                                clickTimeoutRef.current = null; // Clear ref after execution
-                            }, SINGLE_CLICK_DELAY_MS);
-                          }}
-                          onDoubleClick={() => {
-                              // If double click happens, clear the pending single click timeout
-                              if (clickTimeoutRef.current) {
-                                  clearTimeout(clickTimeoutRef.current);
-                                  clickTimeoutRef.current = null;
-                              }
-                              // The EditableCell's onDoubleClick will handle the editing start
-                              // We don't need to do anything else here for the double click itself
-                          }}
-                      >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                    {table.getHeaderGroups().map(headerGroup => (
+                        <tr key={headerGroup.id}>
+                            {headerGroup.headers.map(header => (
+                                <th key={header.id}
+                                    style={{
+                                        border: '1px solid black', padding: '4px', textAlign: 'left',
+                                        // Indicate sortable columns
+                                        cursor: header.column.getCanSort() ? 'pointer' : 'default',
+                                        // Indicate filtered columns (bold column header)
+                                        fontWeight: activeFilterIds.has(header.column.id) ? 'bold' : 'normal',
+                                    }}
+                                    onClick={header.column.getToggleSortingHandler()} // Enable sorting on header click
+                                >
+                                    {flexRender(header.column.columnDef.header, header.getContext())}
+                                    {/* Add Sort Icons */}
+                                    {{
+                                        asc: ' 🔼',
+                                        desc: ' 🔽',
+                                    }[header.column.getIsSorted() as string] ?? null}
+                                </th>
+                            ))}
+                        </tr>
+                    ))}
+                </thead>
+                <tbody>
+                    {table.getRowModel().rows.map(row => (
+                        <tr key={row.id}>
+                            {row.getVisibleCells().map(cell => (
+                                <td key={cell.id}
+                                    style={{
+                                        border: '1px solid black', padding: '0',
+                                        cursor: cell.column.getCanFilter() ? 'pointer' : 'default', // Indicate clickable filter cells
+                                        // Apply bold style to whole column if filter active (alternative to header bold)
+                                        // fontWeight: activeFilterIds.has(cell.column.id) ? 'bold' : 'normal',
+                                    }}
+                                    onClick={() => {
+                                        // Clear any previous pending click timeout
+                                        if (clickTimeoutRef.current) {
+                                            clearTimeout(clickTimeoutRef.current);
+                                            clickTimeoutRef.current = null;
+                                        }
+
+                                        // Start a new timeout for the single click action (filtering)
+                                        clickTimeoutRef.current = setTimeout(() => {
+                                            // Execute filter action only if the timeout completes
+                                            if (cell.column.getCanFilter()) {
+                                                handleCellClickForFilter(cell.column.id, cell.getContext().getValue());
+                                            }
+                                            clickTimeoutRef.current = null; // Clear ref after execution
+                                        }, SINGLE_CLICK_DELAY_MS);
+                                    }}
+                                    onDoubleClick={() => {
+                                        // If double click happens, clear the pending single click timeout
+                                        if (clickTimeoutRef.current) {
+                                            clearTimeout(clickTimeoutRef.current);
+                                            clickTimeoutRef.current = null;
+                                        }
+                                        // The EditableCell's onDoubleClick will handle the editing start
+                                        // We don't need to do anything else here for the double click itself
+                                    }}
+                                >
+                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
-      );
-    };
-    
-    export default CampaignTable;
+    );
+};
+
+export default CampaignTable;

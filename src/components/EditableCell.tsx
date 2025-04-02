@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
-import React, { useState, useEffect, ChangeEvent, FocusEvent } from 'react';
+import React, { ChangeEvent, useEffect, useState } from 'react';
 
 interface EditableCellProps {
   initialValue: string | number | null | undefined;
@@ -33,7 +33,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
     setValue(e.target.value);
   };
 
-  const handleBlur = (e: FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleBlur = () => {
     setIsEditing(false);
     let finalValue: string | number | null = value;
 
@@ -47,7 +47,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
         // Basic validation: check if it's a valid number
         finalValue = isNaN(numValue) ? initialValue ?? null : numValue; // Revert if not a number
         // Add min/max validation if needed based on cellConfig
-        if (cellConfig.min !== undefined && finalValue !== null && finalValue < cellConfig.min) {
+        if (cellConfig.min !== undefined && typeof finalValue === 'number' && finalValue < cellConfig.min) {
             finalValue = cellConfig.min; // Or revert/show error
         }
       }
@@ -148,8 +148,8 @@ const EditableCell: React.FC<EditableCellProps> = ({
       ) : (
         // Display formatted value when not editing
         // Handle potential Timestamp for startDate display
-         value instanceof Timestamp ? value.toDate().toLocaleDateString() :
-         value ?? '-' // Display '-' for null/undefined
+        (value as any) instanceof Timestamp ? (value as unknown as Timestamp).toDate().toLocaleDateString() :
+        value ?? '-' // Display '-' for null/undefined
       )}
     </div>
   );
